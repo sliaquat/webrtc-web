@@ -20,15 +20,26 @@ io.sockets.on('connection', function(socket) {
         socket.emit('log', array);
     }
 
-    socket.on('message', function(message, clientName) {
+    socket.on('message', function(message, clientName, room) {
         log('Client ' + clientName + ' said: ', message);
         // for a real app, would be room-only (not broadcast)
         //SHL: The above line is deep. Right now, the message is sent to all except the receiver.
         //SHL: In actuality, it should be sent to members of a room only except the receiver.
         //SHL: eg: io.sockets.in(room).emit('message', message);
         //SHL: where room will be sent by the client.
-        socket.broadcast.emit('message', message);
+
+        // socket.broadcast.emit('message', message);
+        socket.broadcast.to(room).emit('message', message);
+
+        if(message === 'bye' && io.sockets.sockets.length > 0){
+            socket.leave(room);
+            socket.disconnect();
+        }
     });
+
+    socket.on('disconnect', function() {
+        log('Received request to create or join room ');
+    })
 
     socket.on('create or join', function(room) {
         log('Received request to create or join room ' + room);

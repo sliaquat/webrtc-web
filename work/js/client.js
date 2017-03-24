@@ -69,7 +69,7 @@ socket.on('log', function (array) {
 function sendMessage(message) {
     //SHL: Client Log 5
     console.log(clientName + ': Client ' + clientName + ' sending message: ', message);
-    socket.emit('message', message, clientName);
+    socket.emit('message', message, clientName, room);
 }
 
 // This client receives a message
@@ -281,6 +281,7 @@ function hangup() {
 function handleRemoteHangup() {
     console.log(clientName + ': Session terminated.');
     stop();
+    sendMessage('bye');
     isInitiator = false;
 }
 
@@ -288,8 +289,10 @@ function stop() {
     isStarted = false;
     // isAudioMuted = false;
     // isVideoMuted = false;
-    pc.close();
-    pc = null;
+    if(pc) {
+        pc.close();
+        pc = null;
+    }
 }
 
 ///////////////////////////////////////////
@@ -369,3 +372,8 @@ function removeCN(sdpLines, mLineIndex) {
     sdpLines[mLineIndex] = mLineElements.join(' ');
     return sdpLines;
 }
+
+
+document.getElementById('leave-room').onclick = function() {
+    hangup();
+};

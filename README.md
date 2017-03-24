@@ -19,3 +19,6 @@ This is a work in progress. If you find a mistake or have a suggestion, please [
 * The sample code.
 * A text editor.
 * Basic knowledge of HTML, CSS and JavaScript.
+
+
+## SHL Notes:
