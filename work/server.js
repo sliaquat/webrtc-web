@@ -21,7 +21,8 @@ io.sockets.on('connection', function(socket) {
     }
 
     socket.on('message', function(message, clientName, room) {
-        log('Client ' + clientName + ' said: ', message);
+        if(message.type !== 'candidate')
+            log('Client ' + clientName + ' said: ', message);
         // for a real app, would be room-only (not broadcast)
         //SHL: The above line is deep. Right now, the message is sent to all except the receiver.
         //SHL: In actuality, it should be sent to members of a room only except the receiver.
