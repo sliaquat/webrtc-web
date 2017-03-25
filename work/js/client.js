@@ -1,11 +1,9 @@
 'use strict';
-console.log('version 12')
+console.log('version 15')
 var isChannelReady = false;
-var isStarted = false;
 var localStream;
 var pc;
 var remoteStream;
-var turnReady;
 
 var pcConfig = {
     'iceServers': [{
@@ -78,20 +76,21 @@ socket.on('message', function (message) {
         //SHL: Step 5 - initiate Stream. Will happen on second
         if (typeof pc === 'undefined')
             createPeerConnection();
+        console.log(clientName + ': Adding local stream to pc. localStream: ' + localStream)
         pc.addStream(localStream);
 
         pc.setRemoteDescription(new RTCSessionDescription(message));
         doAnswer();
 
-    } else if (message.type === 'answer' && isStarted) {
+    } else if (message.type === 'answer') {
         pc.setRemoteDescription(new RTCSessionDescription(message));
-    } else if (message.type === 'candidate' && isStarted) {
+    } else if (message.type === 'candidate') {
         var candidate = new RTCIceCandidate({
             sdpMLineIndex: message.label,
             candidate: message.candidate
         });
         pc.addIceCandidate(candidate);
-    } else if (message === 'bye' && isStarted) {
+    } else if (message === 'bye') {
         handleRemoteHangup();
     }
 });
@@ -183,9 +182,9 @@ function onCreateSessionDescriptionError(error) {
 
 
 function handleRemoteStreamAdded(event) {
-    console.log(clientName + ': Remote stream added.');
     remoteVideo.src = window.URL.createObjectURL(event.stream);
     remoteStream = event.stream;
+    console.log(clientName + ': Remote stream added.: ' + JSON.stringify(remoteStream));
 }
 
 function handleRemoteStreamRemoved(event) {
@@ -206,7 +205,6 @@ function handleRemoteHangup() {
 }
 
 function stop() {
-    isStarted = false;
     // isAudioMuted = false;
     // isVideoMuted = false;
     if (pc) {
