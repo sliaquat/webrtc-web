@@ -1,10 +1,10 @@
 'use strict';
-console.log('version 15')
+console.log('version 20')
 var isChannelReady = false;
 var localStream;
 var pc;
 var remoteStream;
-
+var isInitiator = false;
 var pcConfig = {
     'iceServers': [{
         'url': 'stun:stun.l.google.com:19302'
@@ -62,25 +62,21 @@ socket.on('log', function (array) {
 
 function sendMessage(message) {
     //SHL: Client Log 5
-    if (message.type !== 'candidate')
+
         console.log(clientName + ': Client ' + clientName + ' sending message: ', message);
     socket.emit('message', message, clientName, room);
 }
 
 // This client receives a message
 socket.on('message', function (message) {
-    if (message.type !== 'candidate')
+
         console.log(clientName + ': received message:', message);
 
     if (message.type === 'offer') {
         //SHL: Step 5 - initiate Stream. Will happen on second
-        if (typeof pc === 'undefined')
-            createPeerConnection();
-        console.log(clientName + ': Adding local stream to pc. localStream: ' + localStream)
-        pc.addStream(localStream);
-
+        createPeerConnection();
         pc.setRemoteDescription(new RTCSessionDescription(message));
-        doAnswer();
+        startLocalStream();
 
     } else if (message.type === 'answer') {
         pc.setRemoteDescription(new RTCSessionDescription(message));
@@ -113,6 +109,14 @@ function gotStream(stream) {
     console.log(clientName + ': 3 - Adding local stream.');
     localVideo.src = window.URL.createObjectURL(stream);
     localStream = stream;
+    pc.addStream(localStream);
+
+    if (isInitiator) {
+        doCall();
+    }
+    else{
+        doAnswer();
+    }
 }
 
 
@@ -317,17 +321,17 @@ document.getElementById('join-room').onclick = function () {
         console.log(clientName + ': 1 - Client Attempted to create or  join room', room);
     }
 
-    startLocalStream();
+
     document.getElementById('join-room').setAttribute("disabled", "disabled");
 };
 
 
 document.getElementById('call').onclick = function () {
     //SHL: Step 3 - getUserMedia
-
+    isInitiator = true;
     createPeerConnection();
-    pc.addStream(localStream);
-    doCall();
+    startLocalStream();
+
     document.getElementById('call').setAttribute("disabled", "disabled");
 
 };

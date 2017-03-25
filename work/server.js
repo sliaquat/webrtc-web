@@ -5,13 +5,13 @@ var nodeStatic = require('node-static');
 var http = require('http');
 var socketIO = require('socket.io');
 
-var fileServer = new(nodeStatic.Server)();
-var app = http.createServer(function(req, res) {
+var fileServer = new (nodeStatic.Server)();
+var app = http.createServer(function (req, res) {
     fileServer.serve(req, res);
 }).listen(8080);
 
 var io = socketIO.listen(app);
-io.sockets.on('connection', function(socket) {
+io.sockets.on('connection', function (socket) {
 
     // convenience function to log server messages on the client
     function log() {
@@ -20,9 +20,8 @@ io.sockets.on('connection', function(socket) {
         socket.emit('log', array);
     }
 
-    socket.on('message', function(message, clientName, room) {
-        if(message.type !== 'candidate')
-            log('Client ' + clientName + ' said: ', message);
+    socket.on('message', function (message, clientName, room) {
+        log('Client ' + clientName + ' said: ', message);
         // for a real app, would be room-only (not broadcast)
         //SHL: The above line is deep. Right now, the message is sent to all except the receiver.
         //SHL: In actuality, it should be sent to members of a room only except the receiver.
@@ -32,17 +31,17 @@ io.sockets.on('connection', function(socket) {
         // socket.broadcast.emit('message', message);
         socket.broadcast.to(room).emit('message', message);
 
-        if(message === 'bye' && io.sockets.sockets.length > 0){
+        if (message === 'bye' && io.sockets.sockets.length > 0) {
             socket.leave(room);
             socket.disconnect();
         }
     });
 
-    socket.on('disconnect', function() {
+    socket.on('disconnect', function () {
         log('Received request to create or join room ');
     })
 
-    socket.on('create or join', function(room) {
+    socket.on('create or join', function (room) {
         log('Received request to create or join room ' + room);
 
         var numClients = io.sockets.sockets.length;
@@ -64,10 +63,10 @@ io.sockets.on('connection', function(socket) {
         }
     });
 
-    socket.on('ipaddr', function() {
+    socket.on('ipaddr', function () {
         var ifaces = os.networkInterfaces();
         for (var dev in ifaces) {
-            ifaces[dev].forEach(function(details) {
+            ifaces[dev].forEach(function (details) {
                 if (details.family === 'IPv4' && details.address !== '127.0.0.1') {
                     socket.emit('ipaddr', details.address);
                 }
