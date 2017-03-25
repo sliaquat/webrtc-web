@@ -1,6 +1,7 @@
 'use strict';
-console.log('version 12')
+
 var isChannelReady = false;
+var isInitiator = false;
 var isStarted = false;
 var localStream;
 var pc;
@@ -23,20 +24,25 @@ var sdpConstraints = {
 
 /////////////////////////////////////////////
 
-document.getElementById('call').setAttribute("disabled", "disabled");
-document.getElementById('leave-room').setAttribute("disabled", "disabled");
-
 var room = 'foo';
-var clientName;
+// Could prompt for room name:
+var clientName = prompt('Enter client name:', 'Unnamed Client');
+console.log('This clients name is: ' + clientName);
+
 //SHL: SHL Step 1 - Connect to socket.io server (Could provide a server address here. By default it is local host.)
 var socket = io.connect();
+
+//SHL: Step 2 - Message socket to join room
+if (room !== '') {
+    socket.emit('create or join', room);
+    //SHL: Client Log 1
+    console.log(clientName + ': 1 - Client Attempted to create or  join room', room);
+}
 
 socket.on('created', function (room) {
     //SHL: Client Log 4
     console.log(clientName + ': 4 - Created room ' + room);
-    document.getElementById('call').removeAttribute("disabled");
-    document.getElementById('leave-room').removeAttribute("disabled");
-
+    isInitiator = true;
 });
 
 socket.on('full', function (room) {
@@ -52,8 +58,6 @@ socket.on('join requested', function (room) {
 socket.on('joined', function (room) {
     console.log(clientName + ': joined: ' + room);
     isChannelReady = true;
-    document.getElementById('call').removeAttribute("disabled");
-    document.getElementById('leave-room').removeAttribute("disabled");
 });
 
 socket.on('log', function (array) {
@@ -64,25 +68,24 @@ socket.on('log', function (array) {
 
 function sendMessage(message) {
     //SHL: Client Log 5
-    if (message.type !== 'candidate')
-        console.log(clientName + ': Client ' + clientName + ' sending message: ', message);
+    console.log(clientName + ': Client ' + clientName + ' sending message: ', message);
     socket.emit('message', message, clientName, room);
 }
 
 // This client receives a message
 socket.on('message', function (message) {
-    if (message.type !== 'candidate')
-        console.log(clientName + ': received message:', message);
+    console.log(clientName + ': received message:', message);
+    if (message === 'got user media') {
+        //SHL: Step 5 - initiate Stream. Will happen on first peer
+        maybeStart();
+    } else if (message.type === 'offer') {
 
-    if (message.type === 'offer') {
         //SHL: Step 5 - initiate Stream. Will happen on second
-        if (typeof pc === 'undefined')
-            createPeerConnection();
-        pc.addStream(localStream);
-
+        if (!isInitiator && !isStarted) {
+            maybeStart();
+        }
         pc.setRemoteDescription(new RTCSessionDescription(message));
         doAnswer();
-
     } else if (message.type === 'answer' && isStarted) {
         pc.setRemoteDescription(new RTCSessionDescription(message));
     } else if (message.type === 'candidate' && isStarted) {
@@ -106,7 +109,12 @@ var constraints = {
     audio: true,
     video: true
 };
-
+//SHL: Step 3 - getUserMedia
+navigator.mediaDevices.getUserMedia(constraints)
+    .then(gotStream)
+    .catch(function (e) {
+        alert('getUserMedia() error: ' + e.name);
+    });
 
 //SHL: Step 4 - getUserMedia
 function gotStream(stream) {
@@ -114,8 +122,46 @@ function gotStream(stream) {
     console.log(clientName + ': 3 - Adding local stream.');
     localVideo.src = window.URL.createObjectURL(stream);
     localStream = stream;
+    sendMessage('got user media');
+
+    //SHL: Step 5 - initiate Stream
+    if (isInitiator) {
+        maybeStart();
+    }
 }
 
+//SHL: Client Log 2
+console.log(clientName + ': 2 - Getting user media with constraints', constraints);
+
+//SHL: Will do nothing since we already have a TURN server.
+if (location.hostname !== 'localhost') {
+    requestTurn(
+        'https://computeengineondemand.appspot.com/turn?username=41784574&key=4080218913'
+    );
+}
+
+//SHL: Will fail on first call as  isChannelReady is false as there is only one client.
+//SHL: Can also be done on call button click.
+function maybeStart() {
+    console.log(clientName + ': >>>>>>> maybeStart() ', isStarted, localStream, isChannelReady);
+
+    if (!isStarted && typeof localStream !== 'undefined' && isChannelReady) {
+        console.log(clientName + ': >>>>>> creating peer connection');
+        createPeerConnection();
+        pc.addStream(localStream);
+        isStarted = true;
+        console.log(clientName + ': isInitiator', isInitiator);
+        if (isInitiator) {
+            doCall();
+        }
+    }
+    else{
+        console.log(clientName + ': >>>>>> cannot start as isStarted: ' + isStarted
+            + ' isChannelReady: ' + isChannelReady
+            + ' localStream: ' + localStream
+        );
+    }
+}
 
 window.onbeforeunload = function () {
     sendMessage('bye');
@@ -139,7 +185,7 @@ function createPeerConnection() {
 }
 
 function handleIceCandidate(event) {
-    // console.log(clientName + ': icecandidate event: ', event);
+    console.log(clientName + ': icecandidate event: ', event);
     if (event.candidate) {
         sendMessage({
             type: 'candidate',
@@ -150,6 +196,12 @@ function handleIceCandidate(event) {
     } else {
         console.log(clientName + ': End of candidates.');
     }
+}
+
+function handleRemoteStreamAdded(event) {
+    console.log(clientName + ': Remote stream added.');
+    remoteVideo.src = window.URL.createObjectURL(event.stream);
+    remoteStream = event.stream;
 }
 
 function handleCreateOfferError(event) {
@@ -181,6 +233,34 @@ function onCreateSessionDescriptionError(error) {
     trace('Failed to create session description: ' + error.toString());
 }
 
+function requestTurn(turnURL) {
+    var turnExists = false;
+    for (var i in pcConfig.iceServers) {
+        if (pcConfig.iceServers[i].url.substr(0, 5) === 'turn:') {
+            turnExists = true;
+            turnReady = true;
+            break;
+        }
+    }
+    if (!turnExists) {
+        console.log(clientName + ': Getting TURN server from ', turnURL);
+        // No TURN server. Get one from computeengineondemand.appspot.com:
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                var turnServer = JSON.parse(xhr.responseText);
+                console.log(clientName + ': Got TURN server: ', turnServer);
+                pcConfig.iceServers.push({
+                    'url': 'turn:' + turnServer.username + '@' + turnServer.turn,
+                    'credential': turnServer.password
+                });
+                turnReady = true;
+            }
+        };
+        xhr.open('GET', turnURL, true);
+        xhr.send();
+    }
+}
 
 function handleRemoteStreamAdded(event) {
     console.log(clientName + ': Remote stream added.');
@@ -192,7 +272,6 @@ function handleRemoteStreamRemoved(event) {
     console.log(clientName + ': Remote stream removed. Event: ', event);
 }
 
-
 function hangup() {
     console.log(clientName + ': Hanging up.');
     stop();
@@ -203,13 +282,14 @@ function handleRemoteHangup() {
     console.log(clientName + ': Session terminated.');
     stop();
     sendMessage('bye');
+    isInitiator = false;
 }
 
 function stop() {
     isStarted = false;
     // isAudioMuted = false;
     // isVideoMuted = false;
-    if (pc) {
+    if(pc) {
         pc.close();
         pc = null;
     }
@@ -293,47 +373,7 @@ function removeCN(sdpLines, mLineIndex) {
     return sdpLines;
 }
 
-function startLocalStream() {
 
-
-    //SHL: Client Log 2
-    console.log(clientName + ': 2 - Getting user media with constraints', constraints);
-
-    navigator.mediaDevices.getUserMedia(constraints)
-        .then(gotStream)
-        .catch(function (e) {
-            alert('getUserMedia() error: ' + e.name);
-        });
-
-}
-
-
-document.getElementById('join-room').onclick = function () {
-    // Could prompt for room name:
-    clientName = prompt('Enter client name:', 'Unnamed Client');
-    console.log('This clients name is: ' + clientName);
-
-    if (room !== '') {
-        socket.emit('create or join', room);
-        //SHL: Client Log 1
-        console.log(clientName + ': 1 - Client Attempted to create or  join room', room);
-    }
-
-    startLocalStream();
-    document.getElementById('join-room').setAttribute("disabled", "disabled");
-};
-
-
-document.getElementById('call').onclick = function () {
-    //SHL: Step 3 - getUserMedia
-
-    createPeerConnection();
-    pc.addStream(localStream);
-    doCall();
-    document.getElementById('call').setAttribute("disabled", "disabled");
-
-};
-
-document.getElementById('leave-room').onclick = function () {
+document.getElementById('leave-room').onclick = function() {
     hangup();
 };
