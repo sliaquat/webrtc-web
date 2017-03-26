@@ -1,5 +1,5 @@
 'use strict';
-console.log('version 20')
+console.log('version 23')
 var isChannelReady = false;
 var localStream;
 var pc;
@@ -58,19 +58,27 @@ socket.on('log', function (array) {
     console.log.apply(console, array);
 });
 
+socket.on('disconnect', function () {
+    console.log('socket disconnected');
+})
+
+socket.on('disconnecting', function () {
+    console.log('about to disconnect');
+})
+
 ////////////////////////////////////////////////
 
 function sendMessage(message) {
     //SHL: Client Log 5
 
-        console.log(clientName + ': Client ' + clientName + ' sending message: ', message);
+    console.log(clientName + ': Client ' + clientName + ' sending message: ', message);
     socket.emit('message', message, clientName, room);
 }
 
 // This client receives a message
 socket.on('message', function (message) {
 
-        console.log(clientName + ': received message:', message);
+    console.log(clientName + ': received message:', message);
 
     if (message.type === 'offer') {
         //SHL: Step 5 - initiate Stream. Will happen on second
@@ -203,9 +211,8 @@ function hangup() {
 }
 
 function handleRemoteHangup() {
-    console.log(clientName + ': Session terminated.');
-    stop();
-    sendMessage('bye');
+    console.log(clientName + ': Session terminated. remotely');
+    hangup();
 }
 
 function stop() {
@@ -312,7 +319,7 @@ function startLocalStream() {
 
 document.getElementById('join-room').onclick = function () {
     // Could prompt for room name:
-    clientName = prompt('Enter client name:', 'Unnamed Client');
+    clientName = prompt('Enter client name:', 'Ahmed');
     console.log('This clients name is: ' + clientName);
 
     if (room !== '') {
@@ -338,4 +345,9 @@ document.getElementById('call').onclick = function () {
 
 document.getElementById('leave-room').onclick = function () {
     hangup();
+};
+
+
+document.getElementById('disconnect-all').onclick = function () {
+    socket.emit('disconnect all', room);
 };

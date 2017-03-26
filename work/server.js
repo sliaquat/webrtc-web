@@ -11,8 +11,9 @@ var app = http.createServer(function (req, res) {
 }).listen(8080);
 
 var io = socketIO.listen(app);
-io.sockets.on('connection', function (socket) {
 
+io.sockets.on('connection', function (socket) {
+    console.log("io.sockets.adapter.rooms: " + JSON.stringify(io.sockets.adapter.rooms));
     // convenience function to log server messages on the client
     function log() {
         var array = ['Message from server:'];
@@ -21,6 +22,7 @@ io.sockets.on('connection', function (socket) {
     }
 
     socket.on('message', function (message, clientName, room) {
+        console.log('Client ' + clientName + ' said: ', message);
         log('Client ' + clientName + ' said: ', message);
         // for a real app, would be room-only (not broadcast)
         //SHL: The above line is deep. Right now, the message is sent to all except the receiver.
@@ -41,26 +43,41 @@ io.sockets.on('connection', function (socket) {
         log('Received request to create or join room ');
     })
 
+    socket.on('disconnect all', function (room) {
+        io.sockets.sockets.forEach(function(s) {
+            s.leave(room);
+            s.disconnect(true);
+        });
+
+        console.log("After Disconnnect all - io.sockets.adapter.rooms: " + JSON.stringify(io.sockets.adapter.rooms));
+        console.log("After Disconnect all - io.sockets.sockets.length: " + io.sockets.sockets.length)
+
+    })
+
     socket.on('create or join', function (room) {
+
         log('Received request to create or join room ' + room);
 
-        var numClients = io.sockets.sockets.length;
-        log('Room ' + room + ' now has ' + numClients + ' client(s)');
 
-        if (numClients === 1) {
+        //Create room if not already created.
+        if (typeof io.sockets.adapter.rooms[room] === 'undefined') {
             socket.join(room);
             log('Client ID ' + socket.id + ' created room ' + room);
             socket.emit('created', room, socket.id);
 
-        } else if (numClients === 2) {
+        }
+        else{ //Join already created Room
             log('Client ID ' + socket.id + ' joined room ' + room);
             io.sockets.in(room).emit('join requested', room);
             socket.join(room);
             socket.emit('joined', room, socket.id);
             io.sockets.in(room).emit('ready');
-        } else { // max two clients
-            socket.emit('full', room);
         }
+        // else { // max two clients
+        //     socket.emit('full', room);
+        // }
+        //
+
     });
 
     socket.on('ipaddr', function () {
@@ -74,4 +91,6 @@ io.sockets.on('connection', function (socket) {
         }
     });
 
+
 });
+
