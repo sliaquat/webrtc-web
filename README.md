@@ -21,4 +21,7 @@ This is a work in progress. If you find a mistake or have a suggestion, please [
 * Basic knowledge of HTML, CSS and JavaScript.
 
 
-## SHL Notes:
+## SHL Personal Notes:
+* This app works well with https://bitbucket.org/sanad83/shlwebrtctest
+* For deployment with SSL: https://www.digitalocean.com/community/tutorials/how-to-set-up-a-node-js-application-for-production-on-ubuntu-16-04
+* See Evernote notes tagged WebRTC
